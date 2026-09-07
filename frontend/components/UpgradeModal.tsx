@@ -3,8 +3,15 @@
 import { useState } from 'react'
 import { createCheckout } from '@/lib/api'
 
+export interface UpgradeDetails {
+  message: string
+  plan?: string
+  limit?: number
+  used?: number
+}
+
 interface Props {
-  details: { message: string; plan: string; limit: number; used: number } | null
+  details: UpgradeDetails | null
   onClose: () => void
 }
 
@@ -26,11 +33,13 @@ export default function UpgradeModal({ details, onClose }: Props) {
       <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-md w-full shadow-2xl">
         <div className="text-center mb-6">
           <div className="text-4xl mb-3">⚡</div>
-          <h2 className="text-xl font-bold text-white">You've reached your limit</h2>
+          <h2 className="text-xl font-bold text-white">
+            {typeof details?.used === 'number' ? "You've reached your limit" : 'Upgrade your plan'}
+          </h2>
           <p className="mt-2 text-gray-400 text-sm">
             {details?.message ?? 'You have reached your free daily word limit.'}
           </p>
-          {details && (
+          {details && typeof details.used === 'number' && (
             <p className="mt-1 text-gray-500 text-xs">
               {details.used} / {details.limit} words used on the <strong>{details.plan}</strong> plan
             </p>

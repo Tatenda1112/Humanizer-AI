@@ -4,8 +4,15 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from middleware.auth import get_current_user
 from services.supabase import get_supabase
+from services import local_dev
+from services import postgres
 
-router = APIRouter()
+def require_billing():
+    if local_dev.enabled() or postgres.enabled():
+        raise HTTPException(status_code=503, detail="Billing is disabled in local development mode")
+
+
+router = APIRouter(dependencies=[Depends(require_billing)])
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 

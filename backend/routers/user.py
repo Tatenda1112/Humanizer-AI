@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from datetime import date
 from middleware.auth import get_current_user
 from services.supabase import get_supabase
+from services import local_dev
+from services import postgres
 
 router = APIRouter()
 
@@ -13,7 +15,11 @@ PLAN_LIMITS = {
 
 
 @router.get("/me")
-async def get_me(current_user=Depends(get_current_user)):
+def get_me(current_user=Depends(get_current_user)):
+    if postgres.enabled():
+        return postgres.profile(current_user.id)
+    if local_dev.enabled():
+        return local_dev.profile()
     supabase = get_supabase()
 
     profile_res = (
@@ -65,7 +71,11 @@ async def get_me(current_user=Depends(get_current_user)):
 
 
 @router.get("/history")
-async def get_history(current_user=Depends(get_current_user)):
+def get_history(current_user=Depends(get_current_user)):
+    if postgres.enabled():
+        return postgres.history(current_user.id)
+    if local_dev.enabled():
+        return local_dev.history()
     supabase = get_supabase()
 
     res = (
@@ -95,7 +105,13 @@ async def get_history(current_user=Depends(get_current_user)):
 
 
 @router.post("/reset-daily")
-async def reset_daily(current_user=Depends(get_current_user)):
+def reset_daily(current_user=Depends(get_current_user)):
+    if postgres.enabled():
+        postgres.reset(current_user.id)
+        return {'message': 'Usage reset'}
+    if local_dev.enabled():
+        local_dev.reset()
+        return {"message": "Local usage reset"}
     supabase = get_supabase()
     today = str(date.today())
 

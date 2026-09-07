@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from services.rewrite import ProviderUnavailableError
 
 load_dotenv()
 
@@ -23,9 +24,9 @@ def call_humanizer(
     if mode == "auto":
         resolved = "ghost_2" if is_paid_user else "ghost_1"
 
-    # Fall back to Ghost 2 if Ghost 1 requested but no DeepSeek key configured
+    # Keep free-tier costs and selected modes predictable; never silently upgrade.
     if resolved == "ghost_1" and not os.getenv("DEEPSEEK_API_KEY"):
-        resolved = "ghost_2"
+        raise ProviderUnavailableError("Ghost 1 is not configured.")
 
     if resolved == "ghost_1":
         from services.deepseek_service import call_deepseek_humanizer

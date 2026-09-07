@@ -17,6 +17,7 @@ export interface HumanizeResponse {
   words_remaining: number | null
   mode_name: string
   provider: string
+  quality?: { warnings: string[]; repair_used: boolean }
 }
 
 export interface DetectResponse {
@@ -62,6 +63,8 @@ export interface Humanization {
 
 // ── Core fetch wrapper ─────────────────────────────────────────
 async function getToken(): Promise<string> {
+  if (process.env.NEXT_PUBLIC_APP_STORAGE === 'postgres') return ''
+  if (process.env.NEXT_PUBLIC_LOCAL_DEV_MODE === 'true') return 'local-development'
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
@@ -79,9 +82,10 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
   try {
     res = await fetch(url, {
       ...options,
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
     })
@@ -101,7 +105,11 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.detail || `Request failed: ${res.status}`)
+    const detail = body.detail
+    const message = typeof detail === 'string' ? detail
+      : Array.isArray(detail) ? detail.map((item: { msg?: string }) => item.msg || 'Invalid input').join('; ')
+      : `Request failed: ${res.status}`
+    throw new Error(message)
   }
 
   return res.json() as Promise<T>

@@ -7,11 +7,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from routers import humanize, detect, user, stripe_router
+from routers import humanize, detect, user, stripe_router, auth
+from services import postgres
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if postgres.enabled():
+        postgres.initialize()
+        print('[startup] PostgreSQL storage ready')
     provider = os.getenv("AI_PROVIDER", "claude").lower()
     print(f"[startup] AI_PROVIDER={provider}")
 
@@ -53,6 +57,7 @@ app.add_middleware(
 )
 
 app.include_router(humanize.router, prefix="/humanize", tags=["humanize"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(detect.router,   prefix="/detect",   tags=["detect"])
 app.include_router(user.router,     prefix="/user",     tags=["user"])
 app.include_router(stripe_router.router, prefix="/stripe", tags=["stripe"])

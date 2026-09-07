@@ -1,4 +1,4 @@
-// File: C:\Users\USER 2026\Desktop\Humanizer app\frontend\app\login\page.tsx
+// File: C:\Users\user\Desktop\Humanizer\Humanizer-AI\frontend\app\login\page.tsx
 import * as entry from '../../../../app/login/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

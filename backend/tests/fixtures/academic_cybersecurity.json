@@ -1,0 +1,15 @@
+{
+  "id": "zimbabwe_cybersecurity",
+  "tone": "academic",
+  "level": "medium",
+  "source": "Artificial intelligence is increasingly presented as both a defensive asset and an offensive instrument within global cybersecurity practice. Cybersecurity institutions employ machine learning and related techniques to detect anomalies, identify malware, and automate incident response, while the same underlying techniques are exploited by malicious actors to generate convincing phishing content, evade detection systems, and scale cybercrime operations (Achuthan et al., 2024; Ofusori et al., 2024). This dual character, commonly described as a double-edged sword, is the organising problem of this dissertation, which examines it specifically within the Zimbabwean context. The tension between AI as a source of defensive advantage and AI as a source of amplified risk is not merely theoretical; it shapes concrete decisions that regulators, organisations, and technology users must make about adoption, investment, and oversight. Understanding how this tension plays out in a developing economy such as Zimbabwe, where digital adoption is accelerating but institutional and technical capacity remains uneven, is central to producing cybersecurity policy and practice that is fit for purpose rather than borrowed uncritically from contexts with very different resource endowments.",
+  "review_requirements": [
+    "Retain both defensive and offensive roles, including all three examples of each.",
+    "Preserve the complete citation and its connection to those examples.",
+    "The dual role, not the phrase double-edged sword, is the dissertation's organising problem.",
+    "Retain regulators, organisations and technology users and all three decision areas.",
+    "Retain accelerating adoption and uneven institutional AND technical capacity in Zimbabwe.",
+    "Retain the closing argument against uncritical borrowing from differently resourced contexts.",
+    "Use fluent academic English without awkward hyphenation, added claims or forced fragments."
+  ]
+}

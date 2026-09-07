@@ -9,14 +9,14 @@ import {
   LimitExceededError,
   type UserProfile,
 } from '@/lib/api'
-import UpgradeModal from '@/components/UpgradeModal'
+import UpgradeModal, { type UpgradeDetails } from '@/components/UpgradeModal'
 
 const LEVELS = ['Light', 'Medium', 'Aggressive'] as const
 const TONES  = ['Academic', 'Casual', 'Professional', 'Friendly', 'Creative'] as const
+const LOCAL_DEV = process.env.NEXT_PUBLIC_LOCAL_DEV_MODE === 'true'
 
 export default function DashboardPage() {
   const router  = useRouter()
-  const supabase = createClient()
 
   const [profile, setProfile]           = useState<UserProfile | null>(null)
   const [inputText, setInputText]       = useState('')
@@ -28,28 +28,43 @@ export default function DashboardPage() {
   const [loading, setLoading]           = useState(false)
   const [copied, setCopied]             = useState(false)
   const [error, setError]               = useState('')
+  const [qualityWarnings, setQualityWarnings] = useState<string[]>([])
   const [showUpgrade, setShowUpgrade]   = useState(false)
-  const [limitDetails, setLimitDetails] = useState<any>(null)
+  const [limitDetails, setLimitDetails] = useState<UpgradeDetails | null>(null)
 
   const wordCount    = inputText.trim()  ? inputText.trim().split(/\s+/).length  : 0
   const outWordCount = outputText.trim() ? outputText.trim().split(/\s+/).length : 0
 
   const loadProfile = useCallback(async () => {
-    try { setProfile(await getProfile()) }
-    catch { router.push('/login') }
+    try {
+      const nextProfile = await getProfile()
+      setProfile(nextProfile)
+      if (nextProfile.plan === 'free') setMode('ghost_1')
+    }
+    catch (err) {
+      if (LOCAL_DEV) setError(err instanceof Error ? err.message : 'Cannot load the local profile')
+      else router.push('/login')
+    }
   }, [router])
 
   useEffect(() => { loadProfile() }, [loadProfile])
 
   async function handleHumanize() {
     if (!inputText.trim() || loading) return
+    if (wordCount > 3000 || inputText.length > 24000) {
+      setError('Please use up to 3,000 words and 24,000 characters per rewrite.')
+      return
+    }
     setLoading(true)
     setError('')
     setOutputText('')
+    setModeName('')
+    setQualityWarnings([])
     try {
       const r = await humanizeText(inputText, level.toLowerCase(), tone.toLowerCase(), mode)
       setOutputText(r.humanized_text)
       setModeName(r.mode_name)
+      setQualityWarnings(r.quality?.warnings ?? [])
       await loadProfile()
     } catch (err) {
       if (err instanceof LimitExceededError) { setLimitDetails(err.details); setShowUpgrade(true) }
@@ -75,13 +90,22 @@ export default function DashboardPage() {
       <header className="flex items-center justify-between px-8 h-14 border-b border-white/[0.06]">
         <span className="font-semibold text-sm tracking-tight text-white">GhostWriter</span>
         <div className="flex items-center gap-4">
-          <span className="text-xs text-white/30">{planLabel} plan</span>
-          <button
-            onClick={async () => { await supabase.auth.signOut(); router.push('/') }}
+          <span className="text-xs text-white/30">{LOCAL_DEV ? 'Local mode · no account needed' : `${planLabel} plan`}</span>
+          {!LOCAL_DEV && <button
+            onClick={async () => {
+              if (process.env.NEXT_PUBLIC_APP_STORAGE === 'postgres') {
+                try {
+                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/auth/logout`, { method: 'POST', credentials: 'include' })
+                  if (!response.ok) throw new Error('Sign out failed')
+                } catch { setError('Could not sign out. Please try again.'); return }
+              } else { await createClient().auth.signOut() }
+              router.push('/login')
+              router.refresh()
+            }}
             className="text-xs text-white/30 hover:text-white/60 transition-colors"
           >
             Sign out
-          </button>
+          </button>}
         </div>
       </header>
 
@@ -95,7 +119,14 @@ export default function DashboardPage() {
             {(['ghost_1', 'ghost_2'] as const).map(m => (
               <button
                 key={m}
-                onClick={() => setMode(m)}
+                onClick={() => {
+                  if (m === 'ghost_2' && profile?.plan === 'free') {
+                    setLimitDetails({ message: 'Ghost 2 is available on Basic and Premium plans.' })
+                    setShowUpgrade(true)
+                    return
+                  }
+                  setMode(m)
+                }}
                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150 ${
                   mode === m
                     ? 'bg-white text-black'
@@ -191,6 +222,11 @@ export default function DashboardPage() {
 
           {/* Output */}
           <div className="flex flex-col rounded-xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+            {qualityWarnings.length > 0 && (
+              <p role="status" className="px-4 py-2 text-xs text-amber-300">
+                Review this rewrite against your original: {qualityWarnings.join(' ')}
+              </p>
+            )}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.05]">
               <span className="text-xs font-medium text-white/25 uppercase tracking-widest">Humanized</span>
               <div className="flex items-center gap-3">

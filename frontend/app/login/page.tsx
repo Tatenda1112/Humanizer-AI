@@ -4,13 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+const POSTGRES = process.env.NEXT_PUBLIC_APP_STORAGE === 'postgres'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function LoginPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [email, setEmail] = useState('tatendatatenda1112@gmail.com')
-  const [password, setPassword] = useState('Tatendamukono1112@')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -19,7 +20,24 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (POSTGRES) {
+      try {
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        if (!response.ok) {
+          const body = await response.json()
+          throw new Error(typeof body.detail === 'string' ? body.detail : 'Unable to sign in')
+        }
+        router.push('/dashboard')
+        router.refresh()
+      } catch (err) { setError(err instanceof Error ? err.message : 'Unable to reach the backend') }
+      finally { setLoading(false) }
+      return
+    }
+
+    const { error } = await createClient().auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -29,8 +47,9 @@ export default function LoginPage() {
   }
 
   async function handleGoogle() {
+    if (POSTGRES) { setError('Use your configured email and password for this development account.'); return }
     setLoading(true)
-    await supabase.auth.signInWithOAuth({
+    await createClient().auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/dashboard` },
     })
@@ -87,7 +106,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="my-5 flex items-center gap-3">
+          {!POSTGRES && <><div className="my-5 flex items-center gap-3">
             <div className="flex-1 h-px bg-gray-700" />
             <span className="text-gray-500 text-sm">or</span>
             <div className="flex-1 h-px bg-gray-700" />
@@ -112,7 +131,7 @@ export default function LoginPage() {
             <Link href="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
               Sign up free
             </Link>
-          </p>
+          </p></>}
         </div>
       </div>
     </div>

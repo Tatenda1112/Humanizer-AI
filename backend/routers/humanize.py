@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+from typing import Literal
 from datetime import date
 from middleware.auth import get_current_user
 from services.ai_provider import call_humanizer
 from services.supabase import get_supabase
+from services import local_dev
+from services import postgres
+from services.rewrite import MAX_CHARACTERS, MAX_WORDS, ProviderUnavailableError, RewriteError
 
 router = APIRouter()
 
@@ -15,14 +19,34 @@ PLAN_LIMITS = {
 
 
 class HumanizeRequest(BaseModel):
-    text: str
-    level: str = "medium"
-    tone: str = "professional"
-    mode: str = "ghost_2"
+    text: str = Field(min_length=1, max_length=MAX_CHARACTERS)
+    level: Literal["light", "medium", "aggressive"] = "medium"
+    tone: Literal["academic", "casual", "professional", "friendly", "creative"] = "professional"
+    mode: Literal["ghost_1", "ghost_2", "auto"] = "auto"
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value or len(value.split()) > MAX_WORDS:
+            raise ValueError(f"Enter between 1 and {MAX_WORDS} words.")
+        return value
 
 
 @router.post("")
-async def humanize_text(req: HumanizeRequest, current_user=Depends(get_current_user)):
+def humanize_text(req: HumanizeRequest, current_user=Depends(get_current_user)):
+    if postgres.enabled():
+        result = generate(req, True, req.mode)
+        postgres.record(current_user.id, req.text, result, req.level, req.tone)
+        return dict(humanized_text=result['humanized_text'], words_used=len(req.text.split()),
+                    words_remaining=None, mode_name=result['mode_name'],
+                    provider=result['provider'], quality=result['quality'])
+    if local_dev.enabled():
+        result = generate(req, True, req.mode)
+        local_dev.record(req.text, result, req.level, req.tone)
+        return dict(humanized_text=result['humanized_text'], words_used=len(req.text.split()),
+                    words_remaining=None, mode_name=result['mode_name'],
+                    provider=result['provider'], quality=result['quality'])
     supabase = get_supabase()
 
     profile_res = (
@@ -70,7 +94,8 @@ async def humanize_text(req: HumanizeRequest, current_user=Depends(get_current_u
             )
 
     is_paid = plan in ("basic", "premium")
-    result = call_humanizer(req.text, req.level, req.tone, is_paid, mode=mode)
+    # Sync SDK calls run in FastAPI's worker pool, not on its async event loop.
+    result = generate(req, is_paid, mode)
 
     supabase.table("humanizations").insert({
         "user_id": current_user.id,
@@ -103,4 +128,14 @@ async def humanize_text(req: HumanizeRequest, current_user=Depends(get_current_u
         "words_remaining": words_remaining,
         "mode_name": result["mode_name"],
         "provider": result["provider"],
+        "quality": result["quality"],
     }
+
+
+def generate(req: HumanizeRequest, is_paid: bool, mode: str) -> dict:
+    try:
+        return call_humanizer(req.text, req.level, req.tone, is_paid, mode=mode)
+    except ProviderUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RewriteError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
