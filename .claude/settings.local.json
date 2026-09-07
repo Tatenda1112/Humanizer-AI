@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(curl http://localhost:8000/health 2>&1)",
+      "PowerShell(netstat -ano)",
+      "PowerShell(Stop-Process -Id 1764 -Force)"
+    ]
+  }
+}
